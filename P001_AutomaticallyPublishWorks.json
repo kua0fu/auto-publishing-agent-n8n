@@ -1,0 +1,1100 @@
+{
+  "name": "P001_AutomaticallyPublishWorks",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Publishing body",
+        "formDescription": "Confirm the release 1, with the picture as the main body. 2. Posts with video as the main body",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Select the subject you want to start publishing",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Vedio"
+                  },
+                  {
+                    "option": "Images"
+                  }
+                ]
+              },
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        -480,
+        -240
+      ],
+      "id": "527fa34d-b82b-4175-922d-a442db95f8e8",
+      "name": "On form submission",
+      "webhookId": "d573eb5b-5494-4257-87c2-fd0c9aebfd82"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        640,
+        -352
+      ],
+      "id": "56a2fd89-86e2-4c3a-be3b-37109e52e53b",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        864,
+        -400
+      ],
+      "id": "640f02f8-b03e-4c60-aa1f-1aeacdbe4ec0",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "operation": "information",
+        "dataPropertyName": "={{ $input.item.binary.Images? 'Images' : 'Images_' + $itemIndex}}"
+      },
+      "type": "n8n-nodes-base.editImage",
+      "typeVersion": 1,
+      "position": [
+        864,
+        -16
+      ],
+      "id": "37de71e7-7b96-47a1-a79d-f91228d69751",
+      "name": "Edit Image"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "$binary",
+        "include": "selectedOtherFields",
+        "fieldsToInclude": "batchId",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        416,
+        64
+      ],
+      "id": "04ec7d24-569b-40c1-b1ca-07b7e2fcc8b9",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f4a378b3-63a1-4ef8-9c3d-04e2c0a10fb3",
+              "name": "index",
+              "value": "={{$itemIndex + 1}}\n",
+              "type": "number"
+            },
+            {
+              "id": "f49d2758-fbaf-45c0-a3b0-0f8ae3eb91c3",
+              "name": "batchId",
+              "value": "={{ $json.batchId }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "selected",
+        "options": {
+          "stripBinary": false
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        640,
+        64
+      ],
+      "id": "874edf53-ddab-47e4-922e-85c47891a61e",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// 每次执行处理 1 条 item\nconst item = $input.item;\nconst data = item.json || {};\n\n// 1. 读取宽高：优先用 size.width / size.height，其次尝试 Geometry\nlet w;\nlet h;\n\nif (\n  data.size &&\n  typeof data.size.width === 'number' &&\n  typeof data.size.height === 'number'\n) {\n  w = data.size.width;\n  h = data.size.height;\n} else if (typeof data.Geometry === 'string') {\n  // 尝试从 \"1024x1536\" 这种格式解析几何信息\n  const match = data.Geometry.match(/(\\d+)x(\\d+)/);\n  if (match) {\n    w = parseInt(match[1], 10);\n    h = parseInt(match[2], 10);\n  }\n}\n\nconst batchId = data.batchId;\nconst index = data.index;\n\n// 如果仍然拿不到宽高，直接标记为 fail\nif (!w || !h) {\n  data.mainImageCheck = {\n    batchId: batchId,\n    index: index,\n    width: w || null,\n    height: h || null,\n    ratio: null,\n    short: null,\n    isPortrait: null,\n    is4by5: null,\n    status: 'fail',\n    quality: 'none',\n    reasons: ['无法从 size 或 Geometry 中解析出宽高。'],\n  };\n\n  item.json = data;\n  return item; // 保留原 binary\n}\n\n// 2. 正式体检逻辑：竖图 + 4:5 ± 容差 + 短边 ≥ 800\nconst short = Math.min(w, h);\nconst long = Math.max(w, h);\nconst ratio = w / h;\nconst isPortrait = h > w;\n\nconst RATIO_4_5 = 4 / 5;  // 0.8\nconst TOLERANCE = 0.04;   // ±0.04 → [0.76, 0.84]\nconst is4by5 = Math.abs(ratio - RATIO_4_5) <= TOLERANCE;\n\n// 分辨率阈值\nconst MIN_SHORT = 800;   // 短边 < 800 → 直接 fail\nconst OK_SHORT = 1080;   // ≥1080 → 推荐标准\nconst HIGH_SHORT = 1600; // ≥1600 → 高质量\n\nvar status = 'pass';   // 'pass' | 'fail'\nvar quality = 'ok';    // 'high' | 'ok' | 'low' | 'none'\nvar reasons = [];\n\n// 2.1 必须是竖图\nif (!isPortrait) {\n  status = 'fail';\n  reasons.push('非竖图（width=' + w + ', height=' + h + '）。');\n}\n\n// 2.2 比例需接近 4:5\nif (!is4by5) {\n  status = 'fail';\n  reasons.push('宽高比为 ' + ratio.toFixed(3) + '，不在 4:5 容差范围内。');\n}\n\n// 2.3 短边至少 800\nif (short < MIN_SHORT) {\n  status = 'fail';\n  reasons.push('短边为 ' + short + 'px，小于 ' + MIN_SHORT + 'px，不适合作为多平台主图。');\n} else {\n  // 只有 short >= 800 时才谈质量档位\n  if (short >= HIGH_SHORT) {\n    quality = 'high';\n    reasons.push('短边 ' + short + 'px，属于高质量主图。');\n  } else if (short >= OK_SHORT) {\n    quality = 'ok';\n    reasons.push('短边 ' + short + 'px，达到 1080px 社交平台推荐级。');\n  } else {\n    quality = 'low';\n    reasons.push('短边 ' + short + 'px，介于 800~1080px，勉强可用，高分辨率位可能略糊。');\n  }\n}\n\n// 如果整体判定为 fail，则 quality 统一记为 'none'，避免误解\nif (status === 'fail') {\n  quality = 'none';\n}\n\n// 3. 把体检结果挂回 json 上\ndata.mainImageCheck = {\n  batchId: batchId,\n  index: index,\n  width: w,\n  height: h,\n  ratio: ratio,\n  short: short,\n  isPortrait: isPortrait,\n  is4by5: is4by5,\n  status: status,\n  quality: quality,\n  reasons: reasons,\n};\n\n// 写回 item.json，保留原来的 binary 不动\nitem.json = data;\n\n// 返回整个 item（包含 binary）\nreturn item;\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1536,
+        64
+      ],
+      "id": "b081e732-0df4-4801-aac5-21924aebaba9",
+      "name": "Code in JavaScript",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "6cc6b64e-7383-4b9d-8170-673bdc8c03cf",
+              "leftValue": "={{ $json.mainImageCheck.status}}",
+              "rightValue": "pass",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "ignoreCase": false
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1760,
+        64
+      ],
+      "id": "3f303213-0cf9-492a-a877-e817f584f493",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "={{$binary.keys()[0]}}",
+        "name": "={{ 'B[' + String($json.batchId).trim() + ']__I[' + String($json.index) + ']' }}\n",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1dEWDB44SrKeHWp-n0bl05TXrvyorSC07",
+          "mode": "list",
+          "cachedResultName": "n8n_image",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1dEWDB44SrKeHWp-n0bl05TXrvyorSC07"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2208,
+        256
+      ],
+      "id": "02ec911d-599f-4742-aca9-d628e288d27d",
+      "name": "Upload file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "uhdUZ8ITLV9gFFKS",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1ctHsN-1QTEr4xPj700sZv9I5bUvMyQN4nc1rjhZK4vc",
+          "mode": "list",
+          "cachedResultName": "n8n_demo_data",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ctHsN-1QTEr4xPj700sZv9I5bUvMyQN4nc1rjhZK4vc/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1435327790,
+          "mode": "list",
+          "cachedResultName": "imageinfo",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ctHsN-1QTEr4xPj700sZv9I5bUvMyQN4nc1rjhZK4vc/edit#gid=1435327790"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "batchId": "={{ $json.batchId }}",
+            "index": "={{ $json.index }}",
+            "status": "={{ $json.status }}",
+            "reasons": "={{ $json.reasons }}"
+          },
+          "matchingColumns": [
+            "batchId"
+          ],
+          "schema": [
+            {
+              "id": "batchId",
+              "displayName": "batchId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "index",
+              "displayName": "index",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "reasons",
+              "displayName": "reasons",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2208,
+        64
+      ],
+      "id": "b3f325ec-b179-4d2b-96ab-71c5c038f1bd",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "sBjbjBzUJ59hKJW3",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1312,
+        64
+      ],
+      "id": "e374dbe9-9fd2-4c95-8e87-16498aed9c07",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2c36c227-45ec-4d12-9b97-23f9d8caa1f9",
+              "name": "format",
+              "value": "={{ $json.format }}",
+              "type": "string"
+            },
+            {
+              "id": "d311c703-fc7e-4cf9-a84e-0eafbcc7688e",
+              "name": "size",
+              "value": "={{ $json.size }}",
+              "type": "object"
+            },
+            {
+              "id": "392a3f42-706e-4b9b-99bf-28444feed618",
+              "name": "path",
+              "value": "={{ $json.path }}",
+              "type": "string"
+            },
+            {
+              "id": "9f37dbb9-12fb-482f-bd4e-c56dbd033730",
+              "name": "path",
+              "value": "={{ $json.path }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "selected",
+        "options": {
+          "stripBinary": false
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1088,
+        -16
+      ],
+      "id": "0e89a5fe-a211-42f6-bd9f-cd5974798a68",
+      "name": "Edit Fields2"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1088,
+        -400
+      ],
+      "id": "91a2d7dd-ac70-41ab-92c5-5211255d2748",
+      "name": "Split Out1"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1ctHsN-1QTEr4xPj700sZv9I5bUvMyQN4nc1rjhZK4vc",
+          "mode": "list",
+          "cachedResultName": "n8n_demo_data",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ctHsN-1QTEr4xPj700sZv9I5bUvMyQN4nc1rjhZK4vc/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1053065269,
+          "mode": "list",
+          "cachedResultName": "croped_image_info",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ctHsN-1QTEr4xPj700sZv9I5bUvMyQN4nc1rjhZK4vc/edit#gid=1053065269"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "platform": "={{ $json.output.platform }}",
+            "title": "={{ $json.output.title }}",
+            "keywords": "={{ $json.output.keywords }}",
+            "polished_content": "={{ $json.output.polished_content }}",
+            "workflow_exec_batchid": "={{ $workflow.id + '-' + $execution.id }}",
+            "count": "={{ $('submit_images').item.json.Images.length }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "workflow_exec_batchid",
+              "displayName": "workflow_exec_batchid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "count",
+              "displayName": "count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "platform",
+              "displayName": "platform",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "keywords",
+              "displayName": "keywords",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "polished_content",
+              "displayName": "polished_content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1312,
+        -400
+      ],
+      "id": "ead3230a-4aaa-4071-90e6-48daad19e1b6",
+      "name": "Append row in sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "sBjbjBzUJ59hKJW3",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": []
+        },
+        "includeOtherFields": true,
+        "include": "selected",
+        "includeFields": "$input.item.binary",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        192,
+        -592
+      ],
+      "id": "8c07029e-a4fe-4b70-b945-7a0492409fb0",
+      "name": "vedio"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c18a3fdb-0aa8-4ed0-8e19-a5d5e7436093",
+              "name": "batchId",
+              "value": "={{ $workflow.id + '-' + $execution.id }}\n",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "selected",
+        "options": {
+          "stripBinary": false
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        192,
+        64
+      ],
+      "id": "23983c71-7512-4a08-866e-72fd6e5b9563",
+      "name": "images"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "12270c3f-91a7-4621-8dfc-c4736689c77d",
+              "name": "Descriptive text",
+              "value": "={{ $json.Brief_description }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        192,
+        -208
+      ],
+      "id": "90ed35e2-b7b6-403d-99bc-c628ece98a3c",
+      "name": "briefdesc_images"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "12270c3f-91a7-4621-8dfc-c4736689c77d",
+              "name": "Descriptive text",
+              "value": "={{ $json['Brief_description'] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        192,
+        -400
+      ],
+      "id": "b3eac767-3679-46d9-a558-80e665eafeb9",
+      "name": "briefdesc_vedio"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nconst prompts = {\n  x: '社交平台:X;请以上述平台的特点润色以下文本:',\n  whatsapp: '社交平台:WhatsApp;请以上述平台的特点润色以下文本:',\n  instagram: '社交平台:Instagram;请以上述平台的特点润色以下文本:'\n};\n\nconst result = [];\n\nfor (const item of items) {\n  const text = item.json['Descriptive text'];\n\n  result.push({ json: { platform: 'x', 描述文本: text, prompt: prompts.x + text } });\n  result.push({ json: { platform: 'whatsapp', 描述文本: text, prompt: prompts.whatsapp + text } });\n  result.push({ json: { platform: 'instagram', 描述文本: text, prompt: prompts.instagram + text } });\n}\n\nreturn result; // ✅ 这里返回数组没问题，因为是 “Run Once for All Items”\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        -352
+      ],
+      "id": "e9eba13e-f9db-4a72-a6cf-50709ff20e75",
+      "name": "prompt_platforms"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json[\"Select the subject you want to start publishing\"] }}",
+                    "rightValue": "Vedio",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "b602e82f-e089-4073-ae20-f33c48aae0f9"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Vedio"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "1dd9b1f5-6f48-4182-ae04-f47c37e3fa98",
+                    "leftValue": "={{ $json[\"Select the subject you want to start publishing\"] }}",
+                    "rightValue": "Images",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Images"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -256,
+        -240
+      ],
+      "id": "9b14efbf-2253-4bb6-8850-46415ae73f73",
+      "name": "vedio&images"
+    },
+    {
+      "parameters": {
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "vedio",
+              "fieldType": "file",
+              "multipleFiles": false,
+              "acceptFileTypes": ".mp4, .mov",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Brief_description",
+              "fieldType": "textarea",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        -544
+      ],
+      "id": "801b27f2-e711-4d08-b6b1-484f030fba20",
+      "name": "submit_vedio",
+      "webhookId": "1a8624ee-c3eb-4e7d-b355-de4479b13963"
+    },
+    {
+      "parameters": {
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Images",
+              "fieldType": "file",
+              "acceptFileTypes": ".jpg, .png",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Brief_description",
+              "fieldType": "textarea"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        -48
+      ],
+      "id": "5fd5bd00-4702-454c-90df-75c6d356bc75",
+      "name": "submit_images",
+      "webhookId": "49dfbffa-3449-4f44-8647-3e30a6fdced2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "88fc43ac-8d9a-4b6e-9767-04d276b67381",
+              "name": "batchId",
+              "value": "={{ $json.mainImageCheck.batchId }}",
+              "type": "string"
+            },
+            {
+              "id": "b8271dec-449c-4430-8aed-9db391c00ac9",
+              "name": "index",
+              "value": "={{ $json.mainImageCheck.index }}",
+              "type": "string"
+            },
+            {
+              "id": "fbfc68f4-a423-42c6-a226-4d77d8b8a0c3",
+              "name": "status",
+              "value": "={{ $json.mainImageCheck.status }}",
+              "type": "string"
+            },
+            {
+              "id": "e458e756-fa9e-42c1-8fed-de96ef6a5012",
+              "name": "reasons",
+              "value": "={{ $json.mainImageCheck.reasons }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "selected",
+        "options": {
+          "stripBinary": false
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1984,
+        160
+      ],
+      "id": "10b9ed36-19d5-4020-bcd8-230a6cb1430e",
+      "name": "passinfo"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "pJZ0GjCHpwS9O4xu",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/pJZ0GjCHpwS9O4xu",
+          "cachedResultName": "P001_sub_ImageEdit"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {}
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1984,
+        -48
+      ],
+      "id": "4196918b-d17c-4858-a401-29910684fa05",
+      "name": "Call 'P001_sub_ImageEdit'"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "8SprKzADpZ7o3zRM",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/8SprKzADpZ7o3zRM",
+          "cachedResultName": "P001_sub_TextEdit"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        864,
+        -208
+      ],
+      "id": "2a33004f-2d45-42f7-9142-994f1a1f5bf2",
+      "name": "Call 'P001_sub_TextEdit'"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "vedio&images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call 'P001_sub_TextEdit'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Image": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Edit Image",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Call 'P001_sub_ImageEdit'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "passinfo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload file": {
+      "main": [
+        []
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields2": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Split Out1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out1": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "images": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "briefdesc_images": {
+      "main": [
+        [
+          {
+            "node": "prompt_platforms",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "briefdesc_vedio": {
+      "main": [
+        [
+          {
+            "node": "prompt_platforms",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prompt_platforms": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "vedio&images": {
+      "main": [
+        [
+          {
+            "node": "submit_vedio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "submit_images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "submit_vedio": {
+      "main": [
+        [
+          {
+            "node": "briefdesc_vedio",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "vedio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "submit_images": {
+      "main": [
+        [
+          {
+            "node": "briefdesc_images",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet1": {
+      "main": [
+        []
+      ]
+    },
+    "passinfo": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Upload file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'P001_sub_TextEdit'": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2c66ab6b-d362-4d20-bc2f-fc6786e3c438",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f837470744c4c5edfc53326ef5caafb8e6ff6c9cb4a078183a3eb76792f88cdf"
+  },
+  "id": "PFS74ziPA5DLERrp",
+  "tags": []
+}

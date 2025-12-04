@@ -1,0 +1,460 @@
+{
+  "name": "P001_sub_TextEdit",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -448,
+        384
+      ],
+      "id": "e902737c-3faa-4bdc-a189-f70bb496ba38",
+      "name": "When Executed by Another Workflow",
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Please polish the following text and output it in the following format:\n0. Transcribe the name of the social platform in the original text\n1. Generate a concise title\n2. Extract 3-5 keywords\n3. Output the edited main content\n\nOriginal text:{{ $('When Executed by Another Workflow').item.json.prompt }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are a professional copy editor. Your task is to polish the text and extract key information. Output the results in strict accordance with the specified JSON format."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        224,
+        -128
+      ],
+      "id": "2b1a9f09-e1f8-46cd-8440-5cd17cf14672",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        240,
+        496
+      ],
+      "id": "2810fe3a-d6fc-40fa-8c11-86c2b96e7b17",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "rNSikBoK9rMqlwB7",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        240,
+        1008
+      ],
+      "id": "2b1048bd-518a-420a-bf28-712fcbac2a00",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "VoM0BtB6qv11FfE8",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "={\n  \"type\": \"object\",\n  \"properties\": {\n    \"platform\": {\n      \"type\": \"string\",\n      \"description\": \"Platform name\"\n    }, \n    \"title\": {\n      \"type\": \"string\",\n      \"description\": \"Article title\"\n    },\n    \"keywords\": {\n      \"type\": \"string\",\n      \"description\": \"Keywords, separated by commas\"\n    },\n    \"polished_content\": {\n      \"type\": \"string\",\n      \"description\": \"The main content after polishing\"\n    }\n  },\n  \"required\":[\"platform\",\"title\",\"keywords\",\"polished_content\"]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        368,
+        96
+      ],
+      "id": "2f0501a6-124b-4ccc-81cb-b5cadaade5ac",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.pollIndex}}",
+                    "rightValue": 0,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    },
+                    "id": "d5c225ca-fbfa-4bbd-b21a-59fd519760f3"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "b2b92c33-a7dc-4209-8283-22cf7c7389d6",
+                    "leftValue": "={{$json.pollIndex}}",
+                    "rightValue": 1,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "61655388-5414-47b9-a187-719978edd1f4",
+                    "leftValue": "={{$json.pollIndex}}",
+                    "rightValue": 2,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        0,
+        368
+      ],
+      "id": "b8f7c241-968b-44c8-88e1-4a992a295ba7",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        96
+      ],
+      "id": "68e48b8f-1fb6-4f1e-9d4d-bb6ee3896842",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "M4Gyv5BJJY3MiM15",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=请对以下文本进行润色，并按照以下格式输出：\n0. 抄录原文本中的社交平台名称\n1. 生成一个简洁的标题\n2. 提取3-5个关键词\n3. 输出润色后的主体内容\n\n原文本：{{ $('When Executed by Another Workflow').item.json.prompt }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "你是一个专业的文案编辑。你的任务是润色文本并提取关键信息。请严格按照指定的 JSON 格式输出结果。"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        208,
+        304
+      ],
+      "id": "9858bdf9-e1be-4315-a472-f0473ab70c6a",
+      "name": "Basic LLM Chain1"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "={\n  \"type\": \"object\",\n  \"properties\": {\n    \"platform\": {\n      \"type\": \"string\",\n      \"description\": \"平台名称\"\n    }, \n    \"title\": {\n      \"type\": \"string\",\n      \"description\": \"文章标题\"\n    },\n    \"keywords\": {\n      \"type\": \"string\",\n      \"description\": \"关键词，用逗号分隔\"\n    },\n    \"polished_content\": {\n      \"type\": \"string\",\n      \"description\": \"润色后的主体内容\"\n    }\n  },\n  \"required\":[\"platform\",\"title\",\"keywords\",\"polished_content\"]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        368,
+        496
+      ],
+      "id": "01688248-da3b-4919-b1bb-05b97bd957c5",
+      "name": "Structured Output Parser1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 获取 static data\nconst workflowStaticData = $getWorkflowStaticData('global');\n\n// 获取原始上游节点数据\n//const originalData = $('When Executed by Another Workflow').all();\n\n// 初始化或读取轮询索引\nlet currentIndex = workflowStaticData.currentIndex ?? 0;\n\n// 判断是否是 IF 节点 false 回流（建议在 IF false 分支回流前加 Set 节点，设置isError: true）\n\ncurrentIndex = (currentIndex + 1) % 3; // 0,1,2循环\n\n// 更新 static data\nworkflowStaticData.currentIndex = currentIndex;\n\n// 输出\nreturn [\n  {\n    json: {\n      pollIndex: currentIndex, // 供 Switch 节点判断分支\n      //originalData\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        384
+      ],
+      "id": "a5faade6-e15f-42fe-9459-5348da041ae8",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": []
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        576,
+        384
+      ],
+      "id": "dee28dff-3084-4d87-97d9-77f4c7b39013",
+      "name": "Edit Fields",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Please polish the following text and output it in the following format:\n0. Transcribe the name of the social platform in the original text\n1. Generate a concise title\n2. Extract 3-5 keywords\n3. Output the edited main content\n\nOriginal text:{{ $('When Executed by Another Workflow').item.json.prompt }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are a professional copy editor. Your task is to polish the text and extract key information. Output the results in strict accordance with the specified JSON format."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        224,
+        784
+      ],
+      "id": "93139626-b235-4654-88e5-25262911934a",
+      "name": "Basic LLM Chain2"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"platform\": {\n      \"type\": \"string\",\n      \"description\":\"Platform name\"\n    }, \n    \"title\": {\n      \"type\": \"string\",\n      \"description\": \"Article title\"\n    },\n    \"keywords\": {\n      \"type\": \"string\",\n      \"description\":\"Keywords, separated by commas\"\n    },\n    \"polished_content\": {\n      \"type\": \"string\",\n      \"description\": \"The main content after polishing\"\n    }\n  },\n  \"required\":[\"platform\",\"title\",\"keywords\",\"polished_content\"]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        368,
+        1008
+      ],
+      "id": "fed670b0-78ec-4e6a-8238-7221a2951eae",
+      "name": "Structured Output Parser2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain2",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Basic LLM Chain2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Basic LLM Chain2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser1": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Basic LLM Chain1",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain1": {
+      "main": [
+        []
+      ]
+    },
+    "Structured Output Parser2": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Basic LLM Chain2",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain2": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "f0c54335-4919-4160-a6b4-da0678c67880",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f837470744c4c5edfc53326ef5caafb8e6ff6c9cb4a078183a3eb76792f88cdf"
+  },
+  "id": "8SprKzADpZ7o3zRM",
+  "tags": []
+}
