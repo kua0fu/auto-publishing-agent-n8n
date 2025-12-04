@@ -5,105 +5,93 @@ A modular n8n-based Auto Publishing Agent for creators and teams. It includes im
 ### Standardize Promotion · Strengthen Product Differentiation
 
 A modular, extensible **Auto Publishing Agent** built with n8n.  
-This project automates the *mechanical and repetitive* parts of promotion — image preparation, platform adaptation, metadata generation, and AI copywriting — so creators, teams, and businesses can invest their time where it truly matters:
+This project automates the *mechanical and repetitive* parts of promotion — image preparation, platform adaptation, metadata generation, and AI copywriting — so creators, teams, and businesses can focus their energy where it truly matters:
 
 ## **Building differentiated products and delivering differentiated services.**
 
 Promotion should not drain the energy needed for innovation.  
-Expression should not be a barrier to value delivery.  
 Automation should remove friction, not add complexity.
 
-This repository contains:
-- A main workflow  
-- Two sub-workflows (ImageEdit + TextEdit)  
-Together forming a full, production-oriented publishing pipeline.
+This repository contains a full end-to-end automation system:
+- 1 Main Workflow  
+- 2 Sub-workflows (ImageEdit + TextEdit)  
 
 ---
 
 # 🌍 Purpose & Philosophy
 
-In the modern landscape, products and services become valuable because of their **uniqueness**, not because their creators spend hours fighting platform rules and formatting requirements.
+In modern creation, true value comes from **unique products and meaningful services**, not from repeatedly learning how each platform prefers images, text, or formatting.
 
-Yet most creators face the same bottleneck:
+Most creators face the same bottlenecks:
+- Different aspect ratios per platform  
+- Repetitive cropping/resizing work  
+- Inconsistent copywriting styles  
+- Manual batch publishing  
 
-> **Publishing is unnecessarily complex, inconsistent, and time-consuming.**
+None of these tasks contribute to differentiation.
 
-People repeatedly spend time learning:
-- Different aspect ratio requirements across platforms  
-- How to crop and resize correctly  
-- Best practices for formats and resolutions  
-- How to rewrite copy for each platform  
-
-These tasks **do not contribute to the differentiation of the product itself**.
-
-This project aims to shift the balance:
-
-# 👉 **Standardize and automate promotion.  
-Let creators focus on the differentiated value only they can produce.**
+### This project aims to shift the balance:
+# 👉 **Standardize and automate promotion,  
+so creators can focus on their differentiated value.**
 
 ---
 
-# 🚀 Features Overview
+# 🚀 Features
 
-## ✔ 1. Main Image Quality Check (QA Engine)
+## ✔ Main Image Quality Check (QA Engine)
 
-Evaluates uploaded images to ensure they meet modern social media standards:
+Evaluates uploaded images according to platform standards:
+- Width/height/ratio detection  
+- Portrait orientation check  
+- 4:5 tolerance (±0.04)  
+- Minimum short-edge constraint  
+- Quality classification: `high / ok / low / none`  
+- Human-readable `reasons[]`
 
-- Detects width, height, and aspect ratio  
-- Verifies portrait orientation  
-- Detects 4:5 ratio tolerance (±0.04)  
-- Ensures minimum short-edge resolution  
-- Outputs classification: `high / ok / low / none`  
-- Provides human-readable explanations for pass/fail  
-
-*(Workflow: `P001_AutomaticallyPublishWorks.json`)*
+**Workflow file:**  
+[`P001_AutomaticallyPublishWorks.json`](P001_AutomaticallyPublishWorks.json)
 
 ---
 
-## ✔ 2. Multi-Platform Image Adaptation (Preset Engine)
+## ✔ Multi-Platform Image Adaptation (Preset System)
 
-Automatically generates platform-ready image variants.
+Automatically generates platform-ready images.
 
 Supported presets:
-
-| Platform | Ratios |
-|----------|--------|
-| Instagram | 1:1, 4:5, 9:16 |
-| Facebook | 1:1, 4:5, 9:16, 16:9 |
-| X/Twitter | 1:1, 16:9 |
+- Instagram: 1:1 / 4:5 / 9:16  
+- Facebook: 1:1 / 4:5 / 9:16 / 16:9  
+- X/Twitter: 1:1 / 16:9  
 
 Features:
 - Smart center cropping  
-- Boundary protections  
-- Size normalization for recommended resolutions  
-- Structured file naming (`B[batch]__I[index]__P[preset]`)  
-- Upload to Google Drive  
+- Boundary handling  
+- Resolution normalization  
+- Structured file naming  
+- Google Drive upload  
 
-*(Workflow: `P001_sub_ImageEdit.json`)*
-
-This removes the repetitive design work required to prepare assets for multiple platforms.
+**Workflow file:**  
+[`P001_sub_ImageEdit.json`](P001_sub_ImageEdit.json)
 
 ---
 
-## ✔ 3. AI Copywriting Pipeline (Structured Output)
+## ✔ AI Copywriting Pipeline (Structured Output)
 
-Given a raw prompt, generates consistent, platform-ready promotional text.
-
-Outputs include:
+Takes a raw prompt and produces structured promotional content:
 - Platform  
 - Title  
 - Keywords  
 - Polished content  
 
-Highlights:
-- Supports OpenAI, Gemini, and OpenRouter  
-- Multi-language (EN / ZH)  
+Supports:
+- OpenAI  
+- Gemini  
+- OpenRouter  
+- English + Chinese output pipelines  
 - Round-robin model selection  
 - Strict JSON schema validation  
 
-*(Workflow: `P001_sub_TextEdit.json`)*
-
-This produces clean, repeatable, structured content suitable for automated publishing.
+**Workflow file:**  
+[`P001_sub_TextEdit.json`](P001_sub_TextEdit.json)
 
 ---
 
@@ -119,7 +107,22 @@ Main Workflow
 └── TextEdit Subworkflow   → AI copy creation
 ```
 
-This modular design makes it easy to extend, replace modules, or integrate into a larger agent system.
+---
+
+# 📸 Screenshots
+
+### **Main Workflow**
+![Main Workflow](assets/P001_AutomaticallyPublishWorks.png)
+
+---
+
+### **ImageEdit Subworkflow**
+![ImageEdit Subworkflow](assets/sub_imageEdit.png)
+
+---
+
+### **TextEdit Subworkflow**
+![TextEdit Subworkflow](assets/sub_textEdit.png)
 
 ---
 
@@ -130,7 +133,11 @@ This modular design makes it easy to extend, replace modules, or integrate into 
 ├── README.md
 ├── P001_AutomaticallyPublishWorks.json
 ├── P001_sub_ImageEdit.json
-└── P001_sub_TextEdit.json
+├── P001_sub_TextEdit.json
+└── assets/
+    ├── P001_AutomaticallyPublishWorks.png
+    ├── sub_imageEdit.png
+    └── sub_textEdit.png
 ```
 
 ---
@@ -138,7 +145,7 @@ This modular design makes it easy to extend, replace modules, or integrate into 
 # 🛠 Requirements
 
 - n8n (self-hosted or cloud)
-- Google Drive OAuth2 credentials
+- Google Drive OAuth2  
 - One or more LLM providers:
   - OpenAI  
   - Gemini  
@@ -148,77 +155,52 @@ This modular design makes it easy to extend, replace modules, or integrate into 
 
 # 📥 Installation & Usage
 
-### 1. Import workflows  
-Import all three JSON files into n8n.
+### 1. Import workflows
+Upload all JSON workflow files into your n8n instance.
 
-### 2. Configure credentials  
-Set:
+### 2. Configure credentials
 - Google Drive  
 - LLM provider(s)
 
-### 3. Run the main workflow  
+### 3. Run the main workflow
 Provide:
-- One or more images  
+- Images  
 - A text prompt  
 
-### 4. Outputs  
-- Image quality report  
-- Platform-ready images  
-- AI-generated structured copy  
+### 4. Outputs
+- Image quality classification  
+- Multi-platform image variants  
+- AI-generated structured promotional copy  
 
-From here you may extend the pipeline with:
-- Auto-posting  
-- Scheduling  
-- Additional platforms  
-- Analytics feedback  
-
----
-
-# 📸 Screenshots (Replace with Your Own)
-
-```
-[Main workflow screenshot]
-```
-```
-[ImageEdit subworkflow screenshot]
-```
-```
-[TextEdit subworkflow screenshot]
-```
-```
-[Generated images screenshot]
-```
+Extend with auto-posting, scheduling, analytics, more presets, or agentic behaviors.
 
 ---
 
 # 🔭 Roadmap
 
-- Automatic publishing to major platforms  
-- Scheduling and posting queues  
-- More presets (LinkedIn, TikTok, YouTube, Pinterest)  
-- Multi-language text generation  
-- Performance analytics integration  
-- Full “Agent Mode”:
-  - Selecting formats  
-  - Generating variants  
-  - Learning from performance metrics  
+- Automatic posting to Instagram / Facebook / X  
+- Scheduling & batching  
+- TikTok / LinkedIn / YouTube / Pinterest presets  
+- Multi-language content generation  
+- Performance analytics feedback loop  
+- Full Agent Mode (choosing formats, optimizing outputs)
 
 ---
 
 # 📜 License
-
 MIT License — free for commercial and personal use.
-
----
-
-# 🙌 Contribute
-
-You are welcome to fork the repository, extend presets, refine prompts, or build posting modules.
 
 ---
 
 # 📩 Contact
 
-For collaboration, discussion, or questions about automation and publishing systems, feel free to reach out.
+For collaboration or questions:
+
+- **LinkedIn:** https://linkedin.com/in/yourprofile  
+- **Email:** yourname.projects@gmail.com  
+
+Feel free to open an Issue or Discussion in this repository.
+
+
 
 
