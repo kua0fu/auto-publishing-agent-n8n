@@ -1,4 +1,21 @@
 ![Auto Publishing Agent Banner](assets/banner.png)
+# Table of Contents
+- [Purpose & Philosophy](#-purpose--philosophy)
+- [Features](#-features)
+  - [Main Image Quality Check](#-main-image-quality-check-qa-engine)
+  - [Multi-Platform Image Adaptation](#-multi-platform-image-adaptation-preset-system)
+  - [AI Copywriting Pipeline](#-ai-copywriting-pipeline-structured-output)
+- [Workflow Architecture](#-workflow-architecture)
+- [Screenshots](#-screenshots)
+  - [Main Workflow](#main-workflow)
+  - [ImageEdit Subworkflow](#imageedit-subworkflow)
+  - [TextEdit Subworkflow](#textedit-subworkflow)
+- [Repository Structure](#-repository-structure)
+- [Requirements](#-requirements)
+- [Installation & Usage](#-installation--usage)
+- [Roadmap](#-roadmap)
+- [License](#-license)
+- [Contact](#-contact)
 
 # auto-publishing-agent-n8n
 A modular n8n-based Auto Publishing Agent for creators and teams. It includes image quality checking, multi-platform image adaptation, and AI-powered copywriting. Designed to standardize the publishing workflow so people can focus on differentiating their own products and services.
